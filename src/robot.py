@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-
+import  hal
 import ctre
 import numpy as np
 import wpilib
 from magicbot import MagicRobot
 
-from auto import trajectories
+from autonomous import trajectories
 from components.chassis import Chassis
-from statemachines import trajectorytracker
+from components import trajectorytracker
 from utils import lazypigeonimu, lazytalonfx
-
 
 class Robot(MagicRobot):
 
@@ -25,7 +24,6 @@ class Robot(MagicRobot):
 
     def createObjects(self):
         """Initialize all wpilib motors & sensors"""
-
         self.ds_r = lazytalonfx.LazyTalonFX(self.DS_R_ID)
         self.dm_r = lazytalonfx.LazyTalonFX(self.DM_R_ID)
 
@@ -39,20 +37,29 @@ class Robot(MagicRobot):
 
         self.imu = lazypigeonimu.LazyPigeonIMU(self.actuator)
 
-        self.driver = wpilib.Joystick(0)
+        self.driver = wpilib.XboxController(0)
+
+    def robotPeriodic(self):
+        pass
+        # print(self.trajectorytracker.is_executing)
 
     def teleopPeriodic(self):
         """Place code here that does things as a result of operator
            actions"""
         try:
-            # if self.driver.getRawButton(1):
-            #     speed = -self.driver.getY()
-            #     rotation = self.driver.getZ()
-            # output_l = speed + rotation
-            # output_r = speed - rotation
-            output_l = 0.3
-            output_r = 0.3
-            self.chassis.setOutput(output_l, output_r)
+            throttle = -self.driver.getRawAxis(1)
+            throttle = 0 if abs(throttle) <= 0.3 else throttle
+
+            rotation = -self.driver.getRawAxis(3) 
+            rotation = 0 if abs(rotation) <= 0.3 else rotation /3
+
+            throttle = (self.driver.getRawAxis(5)  + 1)/2
+            throttle = 0 if abs(throttle) <= 0.3 else throttle
+            reverse = (self.driver.getRawAxis(2)+1)/2
+            reverse = 0 if abs(reverse) <= 0.3 else reverse
+
+            print(rotation)
+            self.chassis.setForzaDrive(throttle,reverse,rotation)
         except:
             self.onException()
 
