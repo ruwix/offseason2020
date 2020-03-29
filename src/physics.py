@@ -16,8 +16,8 @@ from pyfrc.physics.units import units
 
 from components import chassis
 
-talon0 = hal.SimDevice("Custom Talon FX[0]")
-talon1 = hal.SimDevice("Custom Talon FX[1]")
+talon0 = hal.SimDevice("Custom Talon FX[1]")
+talon1 = hal.SimDevice("Custom Talon FX[3]")
 talon0.createDouble("Position", False, 0)
 talon1.createDouble("Position", False, 0)
 
@@ -30,6 +30,12 @@ class PhysicsEngine:
     """
 
     chassis: chassis.Chassis
+
+    @staticmethod
+    def setSimulationPose(pose):
+        hal.simulation.SimDeviceSim(f"Field2D").getDouble("x").set(pose.translation().x)
+        hal.simulation.SimDeviceSim(f"Field2D").getDouble("y").set(pose.translation().y)
+        hal.simulation.SimDeviceSim(f"Field2D").getDouble("rot").set(pose.rotation().degrees())
 
     def __init__(self, physics_controller: PhysicsInterface):
 
@@ -49,13 +55,8 @@ class PhysicsEngine:
         self.wheel_velocity = chassis.WheelState()
 
     def getMotorSpeed(self, id):
-        is_inverted = (
-            hal.simulation.SimDeviceSim(f"Talon FX[{id}]").getBoolean("Inverted?").get()
-        )
-        invert = -1 if is_inverted else 1
         return (
-            invert
-            * hal.simulation.SimDeviceSim(f"Talon FX[{id}]")
+            hal.simulation.SimDeviceSim(f"Talon FX[{id}]")
             .getDouble("Motor Output")
             .get()
         )
@@ -75,41 +76,17 @@ class PhysicsEngine:
                             time that this function was called
         """
 
-        self.wheel_velocity.left = self.getMotorSpeed(0)
-        self.wheel_velocity.right = self.getMotorSpeed(1)
+        self.wheel_velocity.left = self.getMotorSpeed(1) * chassis.Chassis.MAX_VELOCITY
+        self.wheel_velocity.right = self.getMotorSpeed(3) * chassis.Chassis.MAX_VELOCITY
 
         self.wheel_position.left += self.wheel_velocity.left * tm_diff
         self.wheel_position.right += self.wheel_velocity.right * tm_diff
 
-        self.setMotorPosition(0, self.wheel_position.left)
-        self.setMotorPosition(1, self.wheel_position.right)
+        self.setMotorPosition(1, self.wheel_position.left)
+        self.setMotorPosition(3, -self.wheel_position.right)
 
-        transform = self.drivetrain.calculate(self.wheel_velocity.left, self.wheel_velocity.right, tm_diff)
+        transform = self.drivetrain.calculate(
+            self.wheel_velocity.left, self.wheel_velocity.right, tm_diff
+        )
 
         pose = self.physics_controller.move_robot(transform)
-
-        # # Update the gyro simulation
-        # # -> FRC gyros are positive clockwise, but the returned pose is positive
-        # #    counter-clockwise
-        # self.gyro.setAngle(-pose.rotation().degrees())
-
-        # # update position (use tm_diff so the rate is constant)
-        # self.position += self.motor.getSpeed() * tm_diff * 3
-
-        # # update limit switches based on position
-        # if self.position <= 0:
-        #     switch1 = True
-        #     switch2 = False
-
-        # elif self.position > 10:
-        #     switch1 = False
-        #     switch2 = True
-
-        # else:
-        #     switch1 = False
-        #     switch2 = False
-
-        # # set values here
-        # self.dio1.setValue(switch1)
-        # self.dio2.setValue(switch2)
-        # self.ain2.setVoltage(self.position)
